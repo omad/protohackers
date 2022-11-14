@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"regexp"
 	"strings"
 )
 
 var clients = make(map[string]connection)
 var leaving = make(chan message)
 var messages = make(chan message)
+
+var validName = regexp.MustCompile("[a-zA-Z0-9]+")
+var containsChar = regexp.MustCompile("[a-zA-Z]")
 
 type message struct {
 	text    string
@@ -55,6 +59,9 @@ func handler(conn net.Conn) {
 
 	// Check name is legal!
 	// must contain at least 1 char, and be only uppercase, lowercase, and digits
+	if !isValidName(name) {
+		return
+	}
 
 	fmt.Fprintln(conn, "* The room contains: "+allUsersNames())
 
@@ -75,9 +82,9 @@ func handler(conn net.Conn) {
 	delete(clients, conn.RemoteAddr().String())
 
 	leaving <- newMessage("* "+name+" has left.", conn)
-
-	conn.Close() // NOTE: ignoring network errors
-
+}
+func isValidName(name string) bool {
+	return containsChar.MatchString(name) && validName.MatchString(name)
 }
 func allUsersNames() string {
 	var sb strings.Builder
