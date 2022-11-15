@@ -13,7 +13,7 @@ var clients = make(map[string]connection)
 var leaving = make(chan message)
 var messages = make(chan message)
 
-var validName = regexp.MustCompile("[a-zA-Z0-9]+")
+var validName = regexp.MustCompile("^[a-zA-Z0-9]+$")
 var containsChar = regexp.MustCompile("[a-zA-Z]")
 
 type message struct {
@@ -49,20 +49,36 @@ func main() {
 }
 
 func handler(conn net.Conn) {
-	defer conn.Close()
+    defer func() {
+        // Use SetLinger to force close the connection
+        err := conn.(*net.TCPConn).SetLinger(0)
+        if err != nil {
+                log.Printf("Error when setting linger: %s", err)
+        }
+        log.Printf("Closing connection to " + conn.RemoteAddr().String())
+        if err := conn.Close(); err != nil {
+            log.Printf("Closing client %v connection returned error: %v\n", conn.RemoteAddr().String(), err)
+        }
+        log.Printf("Closed")
+    }()
 
+
+    log.Println("Accepted connection from: " + conn.RemoteAddr().String())
 	fmt.Fprintln(conn, "Welcome to DamoChat! What shall I call you?")
 	input := bufio.NewScanner(conn)
 
-	input.Scan()
+    input.Scan()
 	name := input.Text()
 
+    log.Println(conn.RemoteAddr().String() + " requested name: " + name)
 	// Check name is legal!
 	// must contain at least 1 char, and be only uppercase, lowercase, and digits
 	if !isValidName(name) {
+        log.Println(conn.RemoteAddr().String() + " requested invalid name: " + name)
 		return
 	}
 
+    log.Println(conn.RemoteAddr().String() + " sending user list")
 	fmt.Fprintln(conn, "* The room contains: "+allUsersNames())
 
 	// Record new client
